@@ -1,0 +1,13 @@
+# Copyright (c) Trainline Limited 2016. All rights reserved. See LICENSE.txt in the project root for license information.
+
+[Unit]
+Description=Upstreamr Service
+After=network.target remote-fs.target nss-lookup.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/upstreamr -p -c /etc/upstreamr/upstreamr.conf
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

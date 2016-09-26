@@ -1,0 +1,8 @@
+boto==2.42.0
+dnspython==1.14.0
+Jinja2==2.8
+MarkupSafe==0.23
+multiprocessing-logging==0.2.4
+requests==2.11.1
+simplejson==3.8.2
+six==1.10.0
