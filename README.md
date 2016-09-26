@@ -1,7 +1,6 @@
-
 ## Upstreamr
 
-### Introduction
+### Introduction
 
 Upstreamr is a rapid templating engine which complements [Environment Manager](https://github.com/trainline/environment-manager), it reads from the same sources as Environment Manager itself and is capable of generating templates for application configuration and can also reload services on trigger demand.
 
