@@ -1,2 +1,2 @@
 upstreamr
-Copyright 2015-2016 Trainline.com Ltd
+Copyright Trainline.com Limited
