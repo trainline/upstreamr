@@ -1,4 +1,4 @@
-# Copyright (c) Trainline.com Limited. All rights reserved. See LICENSE.txt in the project root for license information.
+# Copyright (c) Trainline Limited, 2016. All rights reserved. See LICENSE.txt in the project root for license information.
 
 init:
 	pip install -r requirements.txt
