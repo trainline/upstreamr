@@ -4,7 +4,7 @@ init:
 	pip install -r requirements.txt
 
 install:
-	install -m 0755 src/upstreamr /usr/sbin/upstreamr
+	install -m 0755 upstreamr/upstreamr /usr/sbin/upstreamr
 	test -d /etc/upstreamr || mkdir /etc/upstreamr
 	test -d /etc/upstreamr/templates || mkdir /etc/upstreamr/templates
 	ifneq ("$(wildcard /lib/systemd/system)","")

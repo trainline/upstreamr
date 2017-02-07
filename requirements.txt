@@ -1,8 +1,11 @@
-boto==2.42.0
-dnspython==1.14.0
-Jinja2==2.8
+appdirs==1.4.0
+boto==2.45.0
+dnspython==1.15.0
+environment-manager==0.0.6
+Jinja2==2.9.5
 MarkupSafe==0.23
-multiprocessing-logging==0.2.4
-requests==2.11.1
-simplejson==3.8.2
+packaging==16.8
+pyparsing==2.1.10
+requests==2.13.0
+simplejson==3.10.0
 six==1.10.0
