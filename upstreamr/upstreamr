@@ -291,11 +291,19 @@ def consul_resolve(name):
         consul_dc = mapping.split('|')[0]
         consul_filename = "%s/consul_%s.json" % (CONFIG['consul']['file_dir'], consul_dc)
         if os.path.exists(consul_filename):
-            with open(consul_filename, 'r') as consul_file_read:
-                consul_object = json_decode(consul_file_read.read())
-                if consul_object is None:
-                    log.error('Can\'t decode json data from file, skipping for now')
-                    return []
+            consul_missing_data = True
+            consul_object = None
+            while consul_missing_data:
+                with open(consul_filename, 'r') as consul_file_read:
+                    try:
+                        consul_object = json_decode(consul_file_read.read())
+                    except Exception:
+                        continue
+                        log.debug('Found a json decode issue, retry')
+                    if consul_object is not None:
+                        consul_missing_data = False
+                    else:
+                        time.sleep(0.1)
             for consul_entry in consul_object:
                 if len(consul_entry['ip_array']) == 0:
                     continue
