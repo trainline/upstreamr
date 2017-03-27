@@ -756,7 +756,7 @@ def main():
     console_handler.setLevel(console_loglevel)
     # create formatter and add it to the handlers
     formatter = logging.Formatter(
-        '%(asctime)s %(name)s %(levelname)s %(message)s', '%b %e %H:%M:%S')
+        '%(asctime)s %(name)s %(levelname)s %(message)s', '%b %d %H:%M:%S')
     logfile_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
     # add the handlers to the logger
