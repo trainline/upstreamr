@@ -19,7 +19,7 @@ import boto.sns
 import boto.dynamodb2
 from boto.dynamodb2.table import Table
 from environment_manager.api import EMApi
-from environment_manager.utils import LogWrapper, to_bool, to_list, json_encode, json_decode, reload_program
+from environment_manager.utils import LogWrapper, to_bool, to_list, json_encode, json_decode, reload_program, json_load_file
 
 # Define global vars
 _DYNAMOCONN = None
@@ -263,11 +263,11 @@ def asg_resolve(name):
     maintenance_list = []
     return_ips = []
     if os.path.exists(CONFIG['asg']['asg_file']):
-        with open(CONFIG['asg']['asg_file'], 'r') as asg_file_read:
-            asg_object = json_decode(asg_file_read.read())
-            if asg_object is None:
-                log.error('Can\'t decode json data from file, skipping for now')
-                return []
+        try:
+            asg_object = json_load_file(CONFIG['asg']['asg_file'])
+        except Exception as error:
+            log.debug('Cannot find result for asg_resolve: ' % error.message )
+            return []
         for asg_entry in asg_object:
             ip_array = eval(asg_entry[CONFIG['asg']['asg_value']])
             if len(ip_array) == 0:
@@ -291,19 +291,11 @@ def consul_resolve(name):
         consul_dc = mapping.split('|')[0]
         consul_filename = "%s/consul_%s.json" % (CONFIG['consul']['file_dir'], consul_dc)
         if os.path.exists(consul_filename):
-            consul_missing_data = True
-            consul_object = None
-            while consul_missing_data:
-                with open(consul_filename, 'r') as consul_file_read:
-                    try:
-                        consul_object = json_decode(consul_file_read.read())
-                    except Exception:
-                        continue
-                        log.debug('Found a json decode issue, retry')
-                    if consul_object is not None:
-                        consul_missing_data = False
-                    else:
-                        time.sleep(0.1)
+            try:
+                consul_object = json_load_file(consul_filename)
+            except Exception as error:
+                log.debug('Cannot find result for consul_resolve: ' % error.message )
+                return []
             for consul_entry in consul_object:
                 if len(consul_entry['ip_array']) == 0:
                     continue
