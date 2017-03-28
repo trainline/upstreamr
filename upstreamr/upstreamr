@@ -266,7 +266,7 @@ def asg_resolve(name):
         try:
             asg_object = json_load_file(CONFIG['asg']['asg_file'])
         except Exception as error:
-            log.debug('Cannot find result for asg_resolve: ' % error.message )
+            log.debug('Cannot find result for asg_resolve: %s' % error.message )
             return []
         for asg_entry in asg_object:
             ip_array = eval(asg_entry[CONFIG['asg']['asg_value']])
@@ -294,7 +294,7 @@ def consul_resolve(name):
             try:
                 consul_object = json_load_file(consul_filename)
             except Exception as error:
-                log.debug('Cannot find result for consul_resolve: ' % error.message )
+                log.debug('Cannot find result for consul_resolve: %s' % error.message )
                 return []
             for consul_entry in consul_object:
                 if len(consul_entry['ip_array']) == 0:
