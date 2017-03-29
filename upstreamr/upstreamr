@@ -372,8 +372,8 @@ def template_thread_runner():
                 try:
                     reload_struct = json_load_file(CONFIG['templates']['reload_struct_file'])
                 except Exception as error:
-                    log.debug('We cannot read json file %s, this is a fatal error: %s' % (CONFIG['templates']['reload_struct_file'], error.message))
-                    time.sleep(30)
+                    log.debug('We cannot read json file %s, this is a fatal error and we might have lost state: %s' % (CONFIG['templates']['reload_struct_file'], error.message))
+                    time.sleep(10)
                     continue
             else:
                 # Initialise empty reload_struct_file
