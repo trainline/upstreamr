@@ -369,7 +369,12 @@ def template_thread_runner():
             log.debug('Starting iteration execution')
             # Initialise our internal memory dictionary for reloads
             if os.path.isfile(CONFIG['templates']['reload_struct_file']):
-                reload_struct = json_load_file(CONFIG['templates']['reload_struct_file'])
+                try:
+                    reload_struct = json_load_file(CONFIG['templates']['reload_struct_file'])
+                except Exception as error:
+                    log.debug('We cannot read json file %s, this is a fatal error: %s' % (CONFIG['templates']['reload_struct_file'], error.message))
+                    time.sleep(30)
+                    continue
             else:
                 # Initialise empty reload_struct_file
                 reload_struct = {}
