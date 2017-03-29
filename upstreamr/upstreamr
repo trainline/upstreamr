@@ -364,15 +364,20 @@ def template_thread_runner():
         jinja2_env.globals.update(dns_resolve=dns_resolve)
         jinja2_env.globals.update(json_decode=json_decode)
 
-        # Initialise our internal memory dictionary for reloads
-        reload_dictionary = {}
-        spurious_process = {}
-        last_nginx_reload = 0
-        pending_reload = False
-
         # Start iterator
         while True:
             log.debug('Starting iteration execution')
+            # Initialise our internal memory dictionary for reloads
+            if os.path.isfile(CONFIG['templates']['reload_struct_file']):
+                reload_struct = json_load_file(CONFIG['templates']['reload_struct_file'])
+            else:
+                # Initialise empty reload_struct_file
+                reload_struct = {}
+                reload_struct['reload_dictionary'] = {}
+                reload_struct['spurious_process'] = {}
+                reload_struct['last_nginx_reload'] = 0
+                reload_struct['pending_reload'] = False
+            # Internal boolean to keep track of reload options, not carried from reload_struct
             do_reload = False
             # Evaluate template so we can use it to render files
             log.debug('Loading template %s' % os.path.basename(CONFIG['templates']['template_file']))
@@ -470,27 +475,27 @@ def template_thread_runner():
 
                     ## Reload process
                     if need_reload and CONFIG['templates']['reload_command']:
-                        log.info('Object requested reload')
+                        log.info('Reload trigger function start')
                         timestamp_now = time.time()
                         # Check that we dont have spurious reloads
-                        if template_filename in reload_dictionary:
+                        if template_filename in reload_struct['reload_dictionary']:
                             # We have already a key, read timestamps
-                            for timestamp in reload_dictionary[template_filename]:
+                            for timestamp in reload_struct['reload_dictionary'][template_filename]:
                                 do_reload = True
                                 time_last_single_reload = int(timestamp_now - timestamp)
                                 if time_last_single_reload < int(CONFIG['templates']['reload_time_limit']):
-                                    # Check if our object is in the spurious_process list
-                                    if template_filename in spurious_process:
+                                    # Check if our object is in the reload_struct['spurious_process'] list
+                                    if template_filename in reload_struct['spurious_process']:
                                         # Define the cool off time horizon to see if we're okay again or not
                                         cool_off_time_horizon = timestamp_now - int(CONFIG['templates']['reload_single_upstream_limit_cool_off_time'])
                                         # Check if we have any timestamps in our list, otherwise assume a sane default of cool_off_time_horizon + 1
-                                        if len(spurious_process[template_filename]) > 0:
-                                            spurious_process_last_reload = spurious_process[template_filename][-1]
+                                        if len(reload_struct['spurious_process'][template_filename]) > 0:
+                                            spurious_process_last_reload = reload_struct['spurious_process'][template_filename][-1]
                                         else:
                                             spurious_process_last_reload = cool_off_time_horizon + 1
                                         if spurious_process_last_reload < cool_off_time_horizon:
                                             # Its not a spurious process anymore, remove from list
-                                            del spurious_process[template_filename]
+                                            del reload_struct['spurious_process'][template_filename]
                                             log.debug('Removing resource %s from spurious list' % template_filename)
                                         else:
                                             # We got a spurious process that requested reload before allowed time
@@ -499,7 +504,7 @@ def template_thread_runner():
                                             spurious_level = 0
                                             # Check each one of the timestamps and see if they match our catching time horizon
                                             catching_time_horizon = timestamp_now - int(CONFIG['templates']['reload_single_upstream_limit_trigger_catching_time'])
-                                            for reload_time in spurious_process[template_filename]:
+                                            for reload_time in reload_struct['spurious_process'][template_filename]:
                                                 if reload_time > catching_time_horizon:
                                                     spurious_level += 1
                                             if spurious_level >= int(CONFIG['templates']['reload_single_upstream_limit_trigger']):
@@ -513,30 +518,30 @@ def template_thread_runner():
                                                     do_reload = False
                                     else:
                                         # New entry, add and pass
-                                        spurious_process[template_filename] = []
+                                        reload_struct['spurious_process'][template_filename] = []
                                         do_reload = True
                         else:
                             # We dont have a key, add our first key and proceed
-                            reload_dictionary[template_filename] = []
+                            reload_struct['reload_dictionary'][template_filename] = []
                             do_reload = True
 
                         if do_reload:
-                            if last_nginx_reload == 0:
+                            if reload_struct['last_nginx_reload'] == 0:
                                 log.info('We have no record of nginx reloads for this thread yet, reloading')
-                                reload_dictionary[template_filename].append(timestamp_now)
+                                reload_struct['reload_dictionary'][template_filename].append(timestamp_now)
                             else:
-                                time_last_reload = int(timestamp_now - last_nginx_reload)
+                                time_last_reload = int(timestamp_now - reload_struct['last_nginx_reload'])
                                 if time_last_reload < int(CONFIG['templates']['reload_time_limit']):
                                     log.info('We have reloaded nginx %s seconds ago, will not reload now' % time_last_reload)
                                     do_reload = False
-                                    pending_reload = True
+                                    reload_struct['pending_reload'] = True
                                 else:
                                     log.info('Our reload threshold is above %s (%s) seconds, reloading' % (int(CONFIG['templates']['reload_time_limit']), time_last_reload))
-                                    reload_dictionary[template_filename].append(timestamp_now)
+                                    reload_struct['reload_dictionary'][template_filename].append(timestamp_now)
 
-                if do_reload or pending_reload:
-                    last_nginx_reload = timestamp_now
-                    pending_reload = False
+                if do_reload or reload_struct['pending_reload']:
+                    reload_struct['last_nginx_reload'] = timestamp_now
+                    reload_struct['pending_reload'] = False
                     program_run_returncode, program_run_output = reload_program(CONFIG['templates']['reload_command'])
                     if program_run_returncode != 0 and CONFIG['templates']['reload_sns_alert_endpoints']:
                         sns_message = "Program failed to reload: %s\n%s" % (CONFIG['templates']['reload_command'], program_run_output)
@@ -550,6 +555,12 @@ def template_thread_runner():
                         for sns_endpoint in CONFIG['templates']['reload_sns_notification_endpoints']:
                             sns_connection = snsconn()
                             sns_connection.publish(topic=sns_endpoint, message=sns_message)
+
+                ## Write new reload_struct
+                json_reload_struct = json_encode(reload_struct)
+                with open(CONFIG['templates']['reload_struct_file'], 'w') as reload_struct_file:
+                    fcntl.flock(reload_struct_file, fcntl.LOCK_EX)
+                    reload_struct_file.write(json_reload_struct)
 
                 ## Compare filename_list against our local directory and remove unnecessary files
                 log.debug('Checking if we need to remove any files')
@@ -820,6 +831,8 @@ def main():
         unparsed_config.set('templates', 'reload_command', None)
     if not (unparsed_config.has_option('templates', 'data_source') or unparsed_config.get('templates', 'data_source') == ''):
         unparsed_config.set('templates', 'data_source', 'em')
+    if not (unparsed_config.has_option('templates', 'reload_struct_file') or unparsed_config.get('templates', 'reload_struct_file') == ''):
+        unparsed_config.set('templates', 'reload_struct_file', '/tmp/upstreamr_reload_struct.json')
     if not (unparsed_config.has_option('templates', 'reload_time_limit') or unparsed_config.get('templates', 'reload_time_limit') == ''):
         unparsed_config.set('templates', 'reload_time_limit', 30)
     if not (unparsed_config.has_option('templates', 'reload_single_upstream_limit_trigger') or unparsed_config.get('templates', 'reload_single_upstream_limit_trigger') == ''):
