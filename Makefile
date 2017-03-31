@@ -10,6 +10,8 @@ ifneq ("$(wildcard /etc/lsb-release)","")
 	OS_FLAVOUR = debian
 else ifneq ("$(wildcard /etc/redhat-release)","")
 	OS_FLAVOUR = redhat
+else
+	$(error OS_FLAVOUR cannot be detected, please specify redhat or debian)
 endif
 endif
 endif
@@ -44,6 +46,18 @@ install:
 ifneq ($(SYSTEMCTL_PRESENT),)
 	$(SYSTEMCTL) enable upstreamr
 endif
+
+package:
+	$(info Packaging uses fpm)
+	mkdir -p /tmp/upstreamr-$$
+	$(MAKE) install OS_FLAVOUR=$OS_FLAVOUR DESTDIR=/tmp/upstreamr-$$
+	PACKAGE_VERSION := $(shell grep version setup.py | awk -F"'" '{print $2}')
+ifeq ($(OS_FLAVOUR),debian)
+	fpm -s dir -t deb -a all -n upstreamr -v $(PACKAGE_VERSION) --iteration 1 --after-install packaging/after-install-$(OS_FLAVOUR).sh --before-remove packaging/before-remove-$(OS_FLAVOUR).sh --description "Rapid templating manager" --deb-user root --deb-group --depends "python-environment_manager" -- -C /tmp/1
+else ifeq ($(OS_FLAVOUR),redhat)
+	fpm -s dir -t rpm -a all -n upstreamr -v $(PACKAGE_VERSION) --iteration 1 --after-install packaging/after-install-$(OS_FLAVOUR).sh --before-remove packaging/before-remove-$(OS_FLAVOUR).sh --description "Rapid templating manager" --rpm-os linux --rpm-user root --rpm-group root --depends "python-environment_manager" -- -C /tmp/1
+endif
+	rm -rf /tmp/upstreamr-$$
 
 all: init install
 
