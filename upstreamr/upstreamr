@@ -678,12 +678,12 @@ def consul_refresher_thread_runner():
                                             consul_service_node_ip = None
                                             if 'Address' in consul_health_service['Service']:
                                                 # We got address, check that we have the right stuff
-                                                if consul_health_service['Service']['Address'] is not '127.0.0.1' or consul_health_service['Service']['Address'] is not '':
+                                                if consul_health_service['Service']['Address'] is not '127.0.0.1' or not consul_health_service['Service']['Address']:
                                                     consul_service_node_ip = consul_health_service['Service']['Address']
                                                 else:
                                                     log.info('Service %s with incorrect IP definition %s in Service' % (consul_service, consul_health_service['Service']['Address']))
                                             if 'Address' in consul_health_service['Node'] and consul_service_node_ip is None:
-                                                if consul_health_service['Node']['Address'] is not '127.0.0.1' or consul_health_service['Node']['Address'] is not '':
+                                                if consul_health_service['Node']['Address'] is not '127.0.0.1' or not consul_health_service['Node']['Address']:
                                                     consul_service_node_ip = consul_health_service['Node']['Address']
                                                 else:
                                                     log.info('Service %s with incorrect IP definition %s in Node' % (consul_service, consul_health_service['Node']['Address']))
