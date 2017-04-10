@@ -3,7 +3,9 @@
 # OS_FLAVOUR if not specified it is autodetected, valid options are debian or redhat
 # SYSTEMCTL_ENABLE allows makefile to configure systemctl services related to upstreamr, valid options are true or false
 
-VERSION = 1.0.1
+VERSION = 1.0.2
+
+TEMPDIR := $(shell mktemp -d)
 
 # Detect OS_FLAVOUR
 ifeq ($(OS_FLAVOUR),)
@@ -51,14 +53,12 @@ endif
 
 package:
 	$(info Packaging uses fpm)
-	mkdir -p /tmp/upstreamr-$$
-	$(MAKE) install OS_FLAVOUR=$OS_FLAVOUR DESTDIR=/tmp/upstreamr-$$
+	$(MAKE) install OS_FLAVOUR=$(OS_FLAVOUR) DESTDIR=$(TEMPDIR) SYSTEMCTL_ENABLE=false
 ifeq ($(OS_FLAVOUR),debian)
-	fpm -s dir -t deb -a all -n upstreamr -v $(VERSION) --iteration 1 --after-install packaging/after-install-$(OS_FLAVOUR).sh --before-remove packaging/before-remove-$(OS_FLAVOUR).sh --description "Rapid templating manager" --deb-user root --deb-group --depends "python-environment_manager" -- -C /tmp/1
+	fpm -s dir -t deb -a all -n upstreamr -v $(VERSION) --iteration 1 --after-install packaging/after-install-$(OS_FLAVOUR).sh --before-remove packaging/before-remove-$(OS_FLAVOUR).sh --description "Rapid templating manager" --deb-user root --deb-group root --depends "python-environment_manager" --depends "python-boto" --depends "python-six" --depends "python-jinja2" --depends "python-dnspython" --depends "python-requests" --prefix / -C $(TEPMPDIR)
 else ifeq ($(OS_FLAVOUR),redhat)
-	fpm -s dir -t rpm -a all -n upstreamr -v $(VERSION) --iteration 1 --after-install packaging/after-install-$(OS_FLAVOUR).sh --before-remove packaging/before-remove-$(OS_FLAVOUR).sh --description "Rapid templating manager" --rpm-os linux --rpm-user root --rpm-group root --depends "python-environment_manager" -- -C /tmp/1
+	fpm -s dir -t rpm -a all -n upstreamr -v $(VERSION) --iteration 1 --after-install packaging/after-install-$(OS_FLAVOUR).sh --before-remove packaging/before-remove-$(OS_FLAVOUR).sh --description "Rapid templating manager" --rpm-os linux --rpm-user root --rpm-group root --depends "python-environment_manager" --depends "python-dns" --depends "python-jinja2" --depends "python-boto" --prefix / -C $(TEMPDIR)
 endif
-	rm -rf /tmp/upstreamr-$$
 
 all: init install
 
