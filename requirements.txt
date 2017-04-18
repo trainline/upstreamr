@@ -1,7 +1,7 @@
 appdirs==1.4.0
 boto==2.45.0
 dnspython==1.15.0
-environment-manager>=0.0.6
+environment-manager>=0.2.3
 Jinja2==2.9.5
 MarkupSafe==0.23
 packaging==16.8
