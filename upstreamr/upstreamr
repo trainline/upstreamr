@@ -470,7 +470,11 @@ def template_thread_runner():
                                         regenerated_host_offline_status = ' (offline)'
                                     else:
                                         regenerated_host_offline_status = ''
+                                        if len(dns_regenerated_host) == 0:
+                                            log.info('Online upstream has ZERO online hosts, not rewriting')
+                                            write_file = False
                                     log.info('File %s has host %s with %s upstreams%s' % (template_filename, regenerated_host['DnsName'], len(dns_regenerated_host), regenerated_host_offline_status))
+
                     if write_file:
                         # they're different, overwrite
                         log.info('Writing file %s' % template_filename)
