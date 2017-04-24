@@ -498,6 +498,7 @@ def template_thread_runner():
                                             spurious_process_last_reload = reload_struct['spurious_process'][template_filename][-1]
                                         else:
                                             spurious_process_last_reload = cool_off_time_horizon + 1
+                                        reload_struct['spurious_process'][template_filename].append(timestamp_now)
                                         if spurious_process_last_reload < cool_off_time_horizon:
                                             # Its not a spurious process anymore, remove from list
                                             del reload_struct['spurious_process'][template_filename]
@@ -524,6 +525,7 @@ def template_thread_runner():
                                     else:
                                         # New entry, add and pass
                                         reload_struct['spurious_process'][template_filename] = []
+                                        reload_struct['spurious_process'][template_filename].append(timestamp_now)
                                         do_reload = True
                         else:
                             # We dont have a key, add our first key and proceed
