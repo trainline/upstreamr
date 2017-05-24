@@ -19,7 +19,7 @@ import boto.sns
 import boto.dynamodb2
 from boto.dynamodb2.table import Table
 from environment_manager.api import EMApi
-from environment_manager.utils import LogWrapper, to_bool, to_list, json_encode, json_decode, reload_program, json_load_file
+from environment_manager.utils import LogWrapper, to_bool, to_list, to_dict, json_encode, json_decode, reload_program, json_load_file
 
 # Define global vars
 _DYNAMOCONN = None
@@ -398,7 +398,8 @@ def template_thread_runner():
                 log.debug('Querying EM server %s with user %s' % (CONFIG['em']['server'], CONFIG['em']['user']))
                 em_session = EMApi(server=CONFIG['em']['server'], user=CONFIG['em']['user'], password=CONFIG['em']['password'])
                 try:
-                    results = em_session.get_upstreams_config()
+                    mymethod = getattr(em_session, CONFIG['em']['operation'])
+                    results = mymethod(**CONFIG['em']['operation_parameters'])
                 except Exception as error:
                     log.debug('We got an error back: %s' % error.message)
                     continue
@@ -880,6 +881,11 @@ def main():
         unparsed_config.set('em', 'user', None)
     if not (unparsed_config.has_option('em', 'password') or unparsed_config.get('em', 'password') == ''):
         unparsed_config.set('em', 'password', None)
+    if not (unparsed_config.has_option('em', 'operation') or unparsed_config.get('em', 'operation') == ''):
+        unparsed_config.set('em', 'operation', 'get_upstreams_config')
+    if not (unparsed_config.has_option('em', 'operation_parameters') or unparsed_config.get('em', 'operation_parameters') == ''):
+        unparsed_config.set('em', 'operation_parameters', {})
+
 
     # Write finished config
     global CONFIG
@@ -900,6 +906,9 @@ def main():
     CONFIG['templates']['data_filter'] = to_list(CONFIG['templates']['data_filter'])
     CONFIG['templates']['reload_sns_notification_endpoints'] = to_list(CONFIG['templates']['reload_sns_notification_endpoints'])
     CONFIG['templates']['reload_sns_alert_endpoints'] = to_list(CONFIG['templates']['reload_sns_alert_endpoints'])
+
+    # Dict converter
+    CONFIG['em']['operation_parameters'] = to_dict(CONFIG['em']['operation_parameters'])
 
     # Launch process threads
     template_runner = multiprocessing.Process(name='template_runner', target=template_thread_runner)
