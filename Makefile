@@ -3,7 +3,7 @@
 # OS_FLAVOUR if not specified it is autodetected, valid options are debian or redhat
 # SYSTEMCTL_ENABLE allows makefile to configure systemctl services related to upstreamr, valid options are true or false
 
-VERSION = 1.1.2
+VERSION = 1.1.3
 
 TEMPDIR := $(shell mktemp -d)
 
