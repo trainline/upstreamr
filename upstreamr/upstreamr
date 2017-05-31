@@ -306,6 +306,15 @@ def dns_resolve(name):
         # We just return our sorted list
         return sorted(answer_list)
 
+def config_option_fix(config_object, section, option):
+    """ Gets config options and defines defaults in case its not what we expect """
+    set_config = False
+    if not config_object.has_option(section, option):
+        set_config = True
+    elif config_object.get(section, option) == '':
+        set_config = True
+    return set_config
+
 def template_thread_runner():
     """ Main thread runner for the templating engine """
     log = LogWrapper()
@@ -805,101 +814,82 @@ def main():
     ### Sanitise config values and adopt default values
     ## Check that sections exist
     log.debug('Sanitising input config')
-    for section in ['asg', 'dynamodb', 'templates']:
+    for section in ['asg', 'dynamodb', 'templates', 'em', 'shutdown']:
         if not unparsed_config.has_section(section):
             unparsed_config.add_section(section)
 
-    ## Check that critical options are in place, otherwise throw an error
-    # Dynamodb section
-    for dynamodb_option in ['table', 'key', 'filter_expression']:
-        if not unparsed_config.has_option('dynamodb', dynamodb_option):
-            raise configparser.NoOptionError(dynamodb_option, 'dynamodb')
-    # EM section
-    for em_option in ['server', 'user', 'password']:
-        if not unparsed_config.has_option('em', em_option):
-            raise configparser.NoOptionError(em_option, 'em')
-    # ASG section
-    if unparsed_config.get('asg', 'use_asg_dynamodb') is True:
-        for dynamodb_asg_option in ['asg_table', 'asg_key', 'asg_value']:
-            if not unparsed_config.has_option('asg', dynamodb_asg_option):
-                raise configparser.NoOptionError(dynamodb_asg_option, 'asg')
-    # Templates section
-    for templates_option in ['destination_directory', 'template_file', 'data_field', 'filename_pattern']:
-        if not unparsed_config.has_option('templates', templates_option):
-            raise configparser.NoOptionError(templates_option, 'templates')
-
-    ## Fill not critical values if they're empty or unexisting
+    ## Fill values if they don't exist
     # Templates
-    if not (unparsed_config.has_option('templates', 'refresh_rate') or unparsed_config.get('templates', 'refresh_rate') == ''):
+    if config_option_fix(unparsed_config, 'templates', 'refresh_rate'):
         unparsed_config.set('templates', 'refresh_rate', 30)
-    if not (unparsed_config.has_option('templates', 'debug') or unparsed_config.get('templates', 'debug') == ''):
+    if config_option_fix(unparsed_config, 'templates', 'debug'):
         unparsed_config.set('templates', 'debug', False)
-    if not (unparsed_config.has_option('dynamodb', 'comparison_operator') or unparsed_config.get('dynamodb', 'comparison_operator') == ''):
+    if config_option_fix(unparsed_config, 'dynamodb', 'comparison_operator'):
         unparsed_config.set('dynamodb', 'comparison_operator', 'contains')
-    if not (unparsed_config.has_option('templates', 'json_decode') or unparsed_config.get('templates', 'json_decode') == ''):
+    if config_option_fix(unparsed_config, 'templates', 'json_decode'):
         unparsed_config.set('templates', 'json_decode', False)
-    if not (unparsed_config.has_option('templates', 'reload_zero_results') or unparsed_config.get('templates', 'reload_zero_results') == ''):
+    if config_option_fix(unparsed_config, 'templates', 'reload_zero_results'):
         unparsed_config.set('templates', 'reload_zero_results', True)
-    if not (unparsed_config.has_option('templates', 'reload_sns_alert_endpoints') or unparsed_config.get('templates', 'reload_sns_alert_endpoints') == ''):
+    if config_option_fix(unparsed_config, 'templates', 'reload_sns_alert_endpoints'):
         unparsed_config.set('templates', 'reload_sns_alert_endpoints', None)
-    if not (unparsed_config.has_option('templates', 'reload_sns_notification_endpoints') or unparsed_config.get('templates', 'reload_sns_notification_endpoints') == ''):
+    if config_option_fix(unparsed_config, 'templates', 'reload_sns_notification_endpoints'):
         unparsed_config.set('templates', 'reload_sns_notification_endpoints', None)
-    if not (unparsed_config.has_option('templates', 'reload_command') or unparsed_config.get('templates', 'reload_command') == ''):
+    if config_option_fix(unparsed_config, 'templates', 'reload_command'):
         unparsed_config.set('templates', 'reload_command', None)
-    if not (unparsed_config.has_option('templates', 'data_source') or unparsed_config.get('templates', 'data_source') == ''):
+    if config_option_fix(unparsed_config, 'templates', 'data_source'):
         unparsed_config.set('templates', 'data_source', 'em')
-    if not (unparsed_config.has_option('templates', 'reload_struct_file') or unparsed_config.get('templates', 'reload_struct_file') == ''):
+    if config_option_fix(unparsed_config, 'templates', 'reload_struct_file'):
         unparsed_config.set('templates', 'reload_struct_file', '/tmp/upstreamr_reload_struct.json')
-    if not (unparsed_config.has_option('templates', 'reload_time_limit') or unparsed_config.get('templates', 'reload_time_limit') == ''):
+    if config_option_fix(unparsed_config, 'templates', 'reload_time_limit'):
         unparsed_config.set('templates', 'reload_time_limit', 30)
-    if not (unparsed_config.has_option('templates', 'reload_single_upstream_limit_trigger') or unparsed_config.get('templates', 'reload_single_upstream_limit_trigger') == ''):
+    if config_option_fix(unparsed_config, 'templates', 'reload_single_upstream_limit_trigger'):
         unparsed_config.set('templates', 'reload_single_upstream_limit_trigger', 3)
-    if not (unparsed_config.has_option('templates', 'reload_single_upstream_limit_trigger_catching_time') or unparsed_config.get('templates', 'reload_single_upstream_limit_trigger_catching_time') == ''):
+    if config_option_fix(unparsed_config, 'templates', 'reload_single_upstream_limit_trigger_catching_time'):
         unparsed_config.set('templates', 'reload_single_upstream_limit_trigger_catching_time', 300)
-    if not (unparsed_config.has_option('templates', 'reload_single_upstream_limit_time') or unparsed_config.get('templates', 'reload_single_upstream_limit_time') == ''):
+    if config_option_fix(unparsed_config, 'templates', 'reload_single_upstream_limit_time'):
         unparsed_config.set('templates', 'reload_single_upstream_limit_time', 120)
-    if not (unparsed_config.has_option('templates', 'reload_single_upstream_limit_cool_off_time') or unparsed_config.get('templates', 'reload_single_upstream_limit_cool_off_time') == ''):
+    if config_option_fix(unparsed_config, 'templates', 'reload_single_upstream_limit_cool_off_time'):
         unparsed_config.set('templates', 'reload_single_upstream_limit_cool_off_time', 600)
 
     # ASG
-    if not (unparsed_config.has_option('asg', 'use_asg_dynamodb') or unparsed_config.get('asg', 'use_asg_dynamodb') == ''):
+    if config_option_fix(unparsed_config, 'asg', 'use_asg_dynamodb'):
         unparsed_config.set('asg', 'use_asg_dynamodb', False)
-    if not (unparsed_config.has_option('asg', 'asg_file') or unparsed_config.get('asg', 'asg_file') == ''):
+    if config_option_fix(unparsed_config, 'asg', 'asg_file'):
         unparsed_config.set('asg', 'asg_file', '/tmp/asg_upstreamr.json')
-    if not (unparsed_config.has_option('asg', 'refresh_rate') or unparsed_config.get('asg', 'refresh_rate') == ''):
+    if config_option_fix(unparsed_config, 'asg', 'refresh_rate'):
         unparsed_config.set('asg', 'refresh_rate', 20)
-    if not (unparsed_config.has_option('asg', 'debug') or unparsed_config.get('asg', 'debug') == ''):
+    if config_option_fix(unparsed_config, 'asg', 'debug'):
         unparsed_config.set('asg', 'debug', False)
     # Consul
-    if not (unparsed_config.has_option('consul', 'use_consul') or unparsed_config.get('consul', 'use_consul') == ''):
+    if config_option_fix(unparsed_config, 'consul', 'use_consul'):
         unparsed_config.set('consul', 'use_consul', False)
-    if not (unparsed_config.has_option('consul', 'file_dir') or unparsed_config.get('consul', 'file_dir') == ''):
+    if config_option_fix(unparsed_config, 'consul', 'file_dir'):
         unparsed_config.set('consul', 'file_dir', '/tmp')
-    if not (unparsed_config.has_option('consul', 'refresh_rate') or unparsed_config.get('consul', 'refresh_rate') == ''):
+    if config_option_fix(unparsed_config, 'consul', 'refresh_rate'):
         unparsed_config.set('consul', 'refresh_rate', 5)
-    if not (unparsed_config.has_option('consul', 'debug') or unparsed_config.get('consul', 'debug') == ''):
+    if config_option_fix(unparsed_config, 'consul', 'debug'):
         unparsed_config.set('consul', 'debug', False)
 
     # Shutdown detection
-    if not (unparsed_config.has_option('shutdown', 'detect_shutdown') or unparsed_config.get('shutdown', 'use_shutdown') == ''):
+    if config_option_fix(unparsed_config, 'shutdown', 'detect_shutdown'):
         unparsed_config.set('shutdown', 'use_shutdown', False)
-    if not (unparsed_config.has_option('shutdown', 'shutdown_file') or unparsed_config.get('shutdown', 'shutdown_file') == ''):
+    if config_option_fix(unparsed_config, 'shutdown', 'shutdown_file'):
         unparsed_config.set('shutdown', 'shutdown_file', '/tmp/shutdown_detect_upstreamr.json')
-    if not (unparsed_config.has_option('shutdown', 'refresh_rate') or unparsed_config.get('shutdown', 'refresh_rate') == ''):
+    if config_option_fix(unparsed_config, 'shutdown', 'refresh_rate'):
         unparsed_config.set('shutdown', 'refresh_rate', 60)
-    if not (unparsed_config.has_option('shutdown', 'debug') or unparsed_config.get('shutdown', 'debug') == ''):
+    if config_option_fix(unparsed_config, 'shutdown', 'debug'):
         unparsed_config.set('shutdown', 'debug', False)
 
     # EM
-    if not (unparsed_config.has_option('em', 'server') or unparsed_config.get('em', 'server') == ''):
+    if config_option_fix(unparsed_config, 'em', 'server'):
         unparsed_config.set('em', 'server', 'localhost')
-    if not (unparsed_config.has_option('em', 'user') or unparsed_config.get('em', 'user') == ''):
+    if config_option_fix(unparsed_config, 'em', 'user'):
         unparsed_config.set('em', 'user', None)
-    if not (unparsed_config.has_option('em', 'password') or unparsed_config.get('em', 'password') == ''):
+    if config_option_fix(unparsed_config, 'em', 'password'):
         unparsed_config.set('em', 'password', None)
-    if not (unparsed_config.has_option('em', 'operation') or unparsed_config.get('em', 'operation') == ''):
+    if config_option_fix(unparsed_config, 'em', 'operation'):
         unparsed_config.set('em', 'operation', 'get_upstreams_config')
-    if not (unparsed_config.has_option('em', 'operation_parameters') or unparsed_config.get('em', 'operation_parameters') == ''):
+    if config_option_fix(unparsed_config, 'em', 'operation_parameters'):
         unparsed_config.set('em', 'operation_parameters', {})
 
     # Write finished config
