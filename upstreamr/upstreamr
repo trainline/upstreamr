@@ -17,13 +17,13 @@ import requests
 from jinja2 import Environment, FileSystemLoader
 import boto.sns
 import boto.dynamodb2
+import boto.ec2
 from boto.dynamodb2.table import Table
 from environment_manager.api import EMApi
 from environment_manager.utils import LogWrapper, to_bool, to_list, to_dict, json_encode, json_decode, reload_program, json_load_file
 
 # Define global vars
-_DYNAMOCONN = None
-_SNSCONN = None
+_CONN = {}
 _AWS_EXPIRATION_TOKEN = None
 CONFIG = None
 ARGS = None
@@ -69,18 +69,21 @@ def aws_authentication(credentials):
         sys.exit(1)
     return aws_access_key_id, aws_secret_access_key, aws_security_token, aws_expiration_token
 
-def dynamoconn():
-    """ This gets a dynamodb connection """
+def awsconn(servicename='sns'):
+    """ This gets a generic aws connection """
     log = LogWrapper()
     # Define globals
+    global _CONN
     global _AWS_EXPIRATION_TOKEN
-    global _DYNAMOCONN
-    # Check existance of dynamoconn
+    # Create key if doesnt exist
+    if servicename not in _CONN:
+        _CONN[servicename] = None
+    # Check existance of connection
     create_creds = False
     try:
-        _DYNAMOCONN.host
-    except (NameError, AttributeError):
-        log.info('No DynamoDB connection found, creating new one')
+        _CONN[servicename].host
+    except (NameError, AttributeError, KeyError):
+        log.info('No %s connection found, creating new one' % servicename)
         create_creds = True
     # Check the token validity
     try:
@@ -89,17 +92,18 @@ def dynamoconn():
         create_creds = True
     if not create_creds:
         if _AWS_EXPIRATION_TOKEN != 0.0 and _AWS_EXPIRATION_TOKEN - time.time() < 300.0:
-            log.info('DynamoDB connection expired, requesting new credentials')
+            log.info('%s connection expired, requesting new credentials' % servicename)
             create_creds = True
 
     # If either is incorrect request new credentials and generate dynamoconn
     if create_creds:
         aws_access_key_id, aws_secret_access_key, aws_security_token, _AWS_EXPIRATION_TOKEN = aws_authentication(ARGS)
-        log.debug('Creating DynamoDB connection')
+        log.debug('Creating %s connection' % servicename)
         connect_try = True
         while connect_try:
             try:
-                _DYNAMOCONN = boto.dynamodb2.connect_to_region(
+                aws_conn_method = getattr(boto, servicename)
+                _CONN[servicename] = aws_conn_method.connect_to_region(
                     ARGS.region,
                     aws_access_key_id=aws_access_key_id,
                     aws_secret_access_key=aws_secret_access_key,
@@ -107,61 +111,12 @@ def dynamoconn():
                     )
                 connect_try = False
             except Exception as error:
-                log.error('Can\'t connect to DynamoDB, will retry: %s' % error.message)
+                log.error('Can\'t connect to %s, will retry: %s' % (servicename, error.message))
                 connect_try = True
                 time.sleep(5)
-        return _DYNAMOCONN
+        return _CONN[servicename]
     else:
-        return _DYNAMOCONN
-
-def snsconn():
-    """ This gets a sns connection """
-    log = LogWrapper()
-    # Create globals
-    global _AWS_EXPIRATION_TOKEN
-    global _SNSCONN
-    # Check existance of sns connection
-    create_creds = False
-    try:
-        _SNSCONN.host
-    except (NameError, AttributeError):
-        create_creds = True
-        log.info('No SNS connection found, creating new one')
-    # Check the token validity
-    try:
-        _AWS_EXPIRATION_TOKEN
-    except (NameError, AttributeError):
-        create_creds = True
-    if not create_creds:
-        if _AWS_EXPIRATION_TOKEN != 0.0 and _AWS_EXPIRATION_TOKEN - time.time() < 300:
-            log.info('SNS connection expired, requesting new credentials')
-            create_creds = True
-
-    # If either is incorrect request new credentials and generate sns connection
-    if create_creds:
-        aws_access_key_id, aws_secret_access_key, aws_security_token, _AWS_EXPIRATION_TOKEN = aws_authentication(ARGS)
-        log.debug('Creating DynamoDB connection')
-        if CONFIG['templates']['reload_sns_alert_endpoints'] or CONFIG['templates']['reload_sns_notification_endpoints']:
-            log.debug('Creating SNS connection')
-            connect_try = False
-            while connect_try:
-                try:
-                    _SNSCONN = boto.sns.connect_to_region(
-                        ARGS.region,
-                        aws_access_key_id=aws_access_key_id,
-                        aws_secret_access_key=aws_secret_access_key,
-                        security_token=aws_security_token
-                        )
-                    connect_try = False
-                except Exception as error:
-                    log.error('Can\'t connect to SNS, will retry: %s' % error.message)
-                    connect_try = True
-                    time.sleep(5)
-            return _SNSCONN
-        else:
-            return None
-    else:
-        return _SNSCONN
+        return _CONN[servicename]
 
 def dynamo_comparison_operator(dyn_key, dyn_comparison_operator):
     """ Build a sem kwarg structure for comparison operator iterations """
@@ -192,7 +147,7 @@ def dynamo_scan(dyn_table,
                 dyn_comparison_operator=None):
     """ Run a scan against dynamodb, captures results and ouputs data as dictionary """
     log = LogWrapper()
-    dynamo_connection = dynamoconn()
+    dynamo_connection = awsconn(servicename='dynamodb2')
     # Set table
     try:
         table = Table(dyn_table, connection=dynamo_connection)
@@ -282,6 +237,17 @@ def asg_resolve(name):
     else:
         return []
 
+def shutdown_list():
+    """ Reads from our instances and gets a list of IP addresses """
+    log = LogWrapper()
+    return_ips = []
+    if os.path.exists(CONFIG['shutdown']['shutdown_file']):
+        try:
+            return_ips = json_load_file(CONFIG['shutdown']['shutdown_file'])
+        except Exception as error:
+            log.debug('Cannot find result for shutdown_list: %s' % error.message)
+    return return_ips
+
 def consul_resolve(name):
     """ Reads from our Consul stream and gets out a list of IP addresses """
     log = LogWrapper()
@@ -311,26 +277,34 @@ def dns_resolve(name):
     if re.match('^(?P<ipaddress>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$', name):
         answer_list.append(name)
         return answer_list
-    # Look in Consul first
-    consul_list = consul_resolve(name)
-    if len(consul_list) == 0:
-        # ASG table InfraAsgIPs content AsgName return IPs
-        asg_list = asg_resolve(name)
-        if len(asg_list) == 0:
-            try:
-                answers = dns.resolver.query(name, 'A')
-            except Exception:
-                answers = []
-            for answer in answers:
-                answer_list.append(answer.to_text())
-            log.debug('Returning entry %s found in DNS' % name)
-            return sorted(answer_list)
-        else:
-            log.debug('Returning entry %s found in ASG List' % name)
-            return sorted(asg_list)
     else:
-        log.debug('Returning entry %s found in Consul' % name)
-        return sorted(consul_list)
+        # Look in Consul first
+        consul_list = consul_resolve(name)
+        if len(consul_list) == 0:
+            # ASG table InfraAsgIPs content AsgName return IPs
+            asg_list = asg_resolve(name)
+            if len(asg_list) == 0:
+                try:
+                    answers = dns.resolver.query(name, 'A')
+                except Exception:
+                    answers = []
+                for answer in answers:
+                    answer_list.append(answer.to_text())
+                log.debug('Returning entry %s found in DNS' % name)
+            else:
+                log.debug('Returning entry %s found in ASG List' % name)
+                answer_list = asg_list
+        else:
+            log.debug('Returning entry %s found in Consul' % name)
+            answer_list = consul_list
+    if CONFIG['shutdown']['detect_shutdown']:
+        # Run through shutdown blacklist
+        shutdown_blacklist = shutdown_list()
+        filtered_answer_list = [x for x in answer_list if x not in shutdown_blacklist]
+        return sorted(filtered_answer_list)
+    else:
+        # We just return our sorted list
+        return sorted(answer_list)
 
 def template_thread_runner():
     """ Main thread runner for the templating engine """
@@ -395,6 +369,8 @@ def template_thread_runner():
             filename_list = []
             # Get query with list of things to go through
             if CONFIG['templates']['data_source'].lower() == 'em':
+                logging.getLogger("requests").setLevel(logging.WARNING)
+                logging.getLogger("urllib3").setLevel(logging.WARNING)
                 log.debug('Querying EM server %s with user %s' % (CONFIG['em']['server'], CONFIG['em']['user']))
                 em_session = EMApi(server=CONFIG['em']['server'], user=CONFIG['em']['user'], password=CONFIG['em']['password'])
                 try:
@@ -558,14 +534,14 @@ def template_thread_runner():
                     if program_run_returncode != 0 and CONFIG['templates']['reload_sns_alert_endpoints']:
                         sns_message = "Program failed to reload: %s\n%s" % (CONFIG['templates']['reload_command'], program_run_output)
                         for sns_endpoint in CONFIG['templates']['reload_sns_alert_endpoints']:
-                            sns_connection = snsconn()
+                            sns_connection = awsconn(servicename='sns')
                             sns_connection.publish(topic=sns_endpoint, message=sns_message)
 
                     # SNS Alert when things are changed
                     if CONFIG['templates']['reload_sns_notification_endpoints']:
                         sns_message = "Program reloaded: %s" % CONFIG['templates']['reload_command']
                         for sns_endpoint in CONFIG['templates']['reload_sns_notification_endpoints']:
-                            sns_connection = snsconn()
+                            sns_connection = awsconn(servicename='sns')
                             sns_connection.publish(topic=sns_endpoint, message=sns_message)
 
                 ## Write new reload_struct
@@ -592,6 +568,33 @@ def template_thread_runner():
             ## Sleep our alloted time and start again
             log.debug('Sleeping for %s seconds' % CONFIG['templates']['refresh_rate'])
             time.sleep(int(CONFIG['templates']['refresh_rate']))
+    except Exception as error:
+        log.error('Caught exception in worker thread: %s' % error.message)
+        raise error
+
+def shutdown_thread_runner():
+    """ Instance Status to filter instances that are shutting-down """
+    log = LogWrapper()
+    ip_list = []
+    # Enable debug if needed
+    if CONFIG['shutdown']['debug']:
+        logging.getLogger().setLevel(logging.DEBUG)
+    try:
+        ec2_conn = awsconn(servicename='ec2')
+        filters = {'instance-state-name' : ['shutting-down', 'terminated', 'stopping', 'stopped']}
+        results = ec2_conn.get_all_instance_status(filters=filters)
+        instances = [i for r in results for i in r.instances]
+        for i in instances:
+            if i.private_ip_address is not None:
+                results.append(i.private_ip_address)
+        log.debug('Converting results to JSON')
+        json_results = json_encode(ip_list)
+        log.debug('Writing file %s' % CONFIG['shutdown']['shutdown_file'])
+        with open(CONFIG['shutdown']['shutdown_file'], 'w') as shutdown_file:
+            fcntl.flock(shutdown_file, fcntl.LOCK_EX)
+            shutdown_file.write(json_results)
+        log.debug('Sleeping for %s seconds' % CONFIG['shutdown']['refresh_rate'])
+        time.sleep(int(CONFIG['shutdown']['refresh_rate']))
     except Exception as error:
         log.error('Caught exception in worker thread: %s' % error.message)
         raise error
@@ -876,6 +879,17 @@ def main():
         unparsed_config.set('consul', 'refresh_rate', 5)
     if not (unparsed_config.has_option('consul', 'debug') or unparsed_config.get('consul', 'debug') == ''):
         unparsed_config.set('consul', 'debug', False)
+
+    # Shutdown detection
+    if not (unparsed_config.has_option('shutdown', 'detect_shutdown') or unparsed_config.get('shutdown', 'use_shutdown') == ''):
+        unparsed_config.set('shutdown', 'use_shutdown', False)
+    if not (unparsed_config.has_option('shutdown', 'shutdown_file') or unparsed_config.get('shutdown', 'shutdown_file') == ''):
+        unparsed_config.set('shutdown', 'shutdown_file', '/tmp/shutdown_detect_upstreamr.json')
+    if not (unparsed_config.has_option('shutdown', 'refresh_rate') or unparsed_config.get('shutdown', 'refresh_rate') == ''):
+        unparsed_config.set('shutdown', 'refresh_rate', 60)
+    if not (unparsed_config.has_option('shutdown', 'debug') or unparsed_config.get('shutdown', 'debug') == ''):
+        unparsed_config.set('shutdown', 'debug', False)
+
     # EM
     if not (unparsed_config.has_option('em', 'server') or unparsed_config.get('em', 'server') == ''):
         unparsed_config.set('em', 'server', 'localhost')
@@ -887,7 +901,6 @@ def main():
         unparsed_config.set('em', 'operation', 'get_upstreams_config')
     if not (unparsed_config.has_option('em', 'operation_parameters') or unparsed_config.get('em', 'operation_parameters') == ''):
         unparsed_config.set('em', 'operation_parameters', {})
-
 
     # Write finished config
     global CONFIG
@@ -902,6 +915,8 @@ def main():
     CONFIG['consul']['debug'] = to_bool(CONFIG['consul']['debug'])
     CONFIG['templates']['debug'] = to_bool(CONFIG['templates']['debug'])
     CONFIG['asg']['debug'] = to_bool(CONFIG['asg']['debug'])
+    CONFIG['shutdown']['detect_shutdown'] = to_bool(CONFIG['shutdown']['detect_shutdown'])
+    CONFIG['shutdown']['debug'] = to_bool(CONFIG['shutdown']['debug'])
 
     # Array converter
     CONFIG['dynamodb']['filter_expression'] = to_list(CONFIG['dynamodb']['filter_expression'])
@@ -917,6 +932,7 @@ def main():
     template_runner = multiprocessing.Process(name='template_runner', target=template_thread_runner)
     asg_refresher_runner = multiprocessing.Process(name='asg_refresher_runner', target=asg_refresher_thread_runner)
     consul_refresher_runner = multiprocessing.Process(name='consul_refresher_runner', target=consul_refresher_thread_runner)
+    shutdown_runner = multiprocessing.Process(name='shutdown_runner', target=shutdown_thread_runner)
 
     running_processes = []
     # Launch processes
@@ -934,7 +950,13 @@ def main():
         running_processes.append(consul_refresher_runner)
     else:
         log.info('No consul runner')
-    # I want to sleep a bit before I start the template engine so ASG can populate
+    if CONFIG['shutdown']['detect_shutdown']:
+        log.info('Starting Consul Refresher thread')
+        shutdown_runner.daemon = True
+        shutdown_runner.start()
+        running_processes.append(shutdown_runner)
+    else:
+        log.info('No shutdown runner')
     log.info('Starting template engine')
     template_runner.daemon = True
     template_runner.start()
@@ -975,6 +997,12 @@ def main():
                     consul_refresher_runner.daemon = True
                     consul_refresher_runner.start()
                     running_processes.append(consul_refresher_runner)
+                elif process.name == 'shutdown_runner':
+                    log.info('Starting new process shutdown_thread_runner')
+                    shutdown_runner = multiprocessing.Process(name='shutdown_runner', target=shutdown_thread_runner)
+                    shutdown_runner.daemon = True
+                    shutdown_runner.start()
+                    running_processes.append(shutdown_runner)
 
 if __name__ == "__main__":
     main()
