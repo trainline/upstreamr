@@ -589,21 +589,23 @@ def shutdown_thread_runner():
     if CONFIG['shutdown']['debug']:
         logging.getLogger().setLevel(logging.DEBUG)
     try:
-        ec2_conn = awsconn(servicename='ec2')
-        filters = {'instance-state-name' : ['shutting-down', 'terminated', 'stopping', 'stopped']}
-        results = ec2_conn.get_all_instance_status(filters=filters)
-        instances = [i for r in results for i in r.instances]
-        for i in instances:
-            if i.private_ip_address is not None:
-                results.append(i.private_ip_address)
-        log.debug('Converting results to JSON')
-        json_results = json_encode(ip_list)
-        log.debug('Writing file %s' % CONFIG['shutdown']['shutdown_file'])
-        with open(CONFIG['shutdown']['shutdown_file'], 'w') as shutdown_file:
-            fcntl.flock(shutdown_file, fcntl.LOCK_EX)
-            shutdown_file.write(json_results)
-        log.debug('Sleeping for %s seconds' % CONFIG['shutdown']['refresh_rate'])
-        time.sleep(int(CONFIG['shutdown']['refresh_rate']))
+        if CONFIG['shutdown']['detect_shutdown']:
+            while True:
+                ec2_conn = awsconn(servicename='ec2')
+                filters = {'instance-state-name' : ['shutting-down', 'terminated', 'stopping', 'stopped']}
+                results = ec2_conn.get_all_instance_status(filters=filters)
+                instances = [i for r in results for i in r.instances]
+                for i in instances:
+                    if i.private_ip_address is not None:
+                        results.append(i.private_ip_address)
+                log.debug('Converting results to JSON')
+                json_results = json_encode(ip_list)
+                log.debug('Writing file %s' % CONFIG['shutdown']['shutdown_file'])
+                with open(CONFIG['shutdown']['shutdown_file'], 'w') as shutdown_file:
+                    fcntl.flock(shutdown_file, fcntl.LOCK_EX)
+                    shutdown_file.write(json_results)
+                log.debug('Sleeping for %s seconds' % CONFIG['shutdown']['refresh_rate'])
+                time.sleep(int(CONFIG['shutdown']['refresh_rate']))
     except Exception as error:
         log.error('Caught exception in worker thread: %s' % error.message)
         raise error
