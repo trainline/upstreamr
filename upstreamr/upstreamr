@@ -306,8 +306,8 @@ def dns_resolve(name):
         # We just return our sorted list
         return sorted(answer_list)
 
-def config_option_fix(config_object, section, option):
-    """ Gets config options and defines defaults in case its not what we expect """
+def config_option_check(config_object, section, option):
+    """ Gets config option and checks it exists and if its empty or not """
     set_config = False
     if not config_object.has_option(section, option):
         set_config = True
@@ -820,76 +820,76 @@ def main():
 
     ## Fill values if they don't exist
     # Templates
-    if config_option_fix(unparsed_config, 'templates', 'refresh_rate'):
+    if config_option_check(unparsed_config, 'templates', 'refresh_rate'):
         unparsed_config.set('templates', 'refresh_rate', 30)
-    if config_option_fix(unparsed_config, 'templates', 'debug'):
+    if config_option_check(unparsed_config, 'templates', 'debug'):
         unparsed_config.set('templates', 'debug', False)
-    if config_option_fix(unparsed_config, 'dynamodb', 'comparison_operator'):
+    if config_option_check(unparsed_config, 'dynamodb', 'comparison_operator'):
         unparsed_config.set('dynamodb', 'comparison_operator', 'contains')
-    if config_option_fix(unparsed_config, 'templates', 'json_decode'):
+    if config_option_check(unparsed_config, 'templates', 'json_decode'):
         unparsed_config.set('templates', 'json_decode', False)
-    if config_option_fix(unparsed_config, 'templates', 'reload_zero_results'):
+    if config_option_check(unparsed_config, 'templates', 'reload_zero_results'):
         unparsed_config.set('templates', 'reload_zero_results', True)
-    if config_option_fix(unparsed_config, 'templates', 'reload_sns_alert_endpoints'):
+    if config_option_check(unparsed_config, 'templates', 'reload_sns_alert_endpoints'):
         unparsed_config.set('templates', 'reload_sns_alert_endpoints', None)
-    if config_option_fix(unparsed_config, 'templates', 'reload_sns_notification_endpoints'):
+    if config_option_check(unparsed_config, 'templates', 'reload_sns_notification_endpoints'):
         unparsed_config.set('templates', 'reload_sns_notification_endpoints', None)
-    if config_option_fix(unparsed_config, 'templates', 'reload_command'):
+    if config_option_check(unparsed_config, 'templates', 'reload_command'):
         unparsed_config.set('templates', 'reload_command', None)
-    if config_option_fix(unparsed_config, 'templates', 'data_source'):
+    if config_option_check(unparsed_config, 'templates', 'data_source'):
         unparsed_config.set('templates', 'data_source', 'em')
-    if config_option_fix(unparsed_config, 'templates', 'reload_struct_file'):
+    if config_option_check(unparsed_config, 'templates', 'reload_struct_file'):
         unparsed_config.set('templates', 'reload_struct_file', '/tmp/upstreamr_reload_struct.json')
-    if config_option_fix(unparsed_config, 'templates', 'reload_time_limit'):
+    if config_option_check(unparsed_config, 'templates', 'reload_time_limit'):
         unparsed_config.set('templates', 'reload_time_limit', 30)
-    if config_option_fix(unparsed_config, 'templates', 'reload_single_upstream_limit_trigger'):
+    if config_option_check(unparsed_config, 'templates', 'reload_single_upstream_limit_trigger'):
         unparsed_config.set('templates', 'reload_single_upstream_limit_trigger', 3)
-    if config_option_fix(unparsed_config, 'templates', 'reload_single_upstream_limit_trigger_catching_time'):
+    if config_option_check(unparsed_config, 'templates', 'reload_single_upstream_limit_trigger_catching_time'):
         unparsed_config.set('templates', 'reload_single_upstream_limit_trigger_catching_time', 300)
-    if config_option_fix(unparsed_config, 'templates', 'reload_single_upstream_limit_time'):
+    if config_option_check(unparsed_config, 'templates', 'reload_single_upstream_limit_time'):
         unparsed_config.set('templates', 'reload_single_upstream_limit_time', 120)
-    if config_option_fix(unparsed_config, 'templates', 'reload_single_upstream_limit_cool_off_time'):
+    if config_option_check(unparsed_config, 'templates', 'reload_single_upstream_limit_cool_off_time'):
         unparsed_config.set('templates', 'reload_single_upstream_limit_cool_off_time', 600)
 
     # ASG
-    if config_option_fix(unparsed_config, 'asg', 'use_asg_dynamodb'):
+    if config_option_check(unparsed_config, 'asg', 'use_asg_dynamodb'):
         unparsed_config.set('asg', 'use_asg_dynamodb', False)
-    if config_option_fix(unparsed_config, 'asg', 'asg_file'):
+    if config_option_check(unparsed_config, 'asg', 'asg_file'):
         unparsed_config.set('asg', 'asg_file', '/tmp/asg_upstreamr.json')
-    if config_option_fix(unparsed_config, 'asg', 'refresh_rate'):
+    if config_option_check(unparsed_config, 'asg', 'refresh_rate'):
         unparsed_config.set('asg', 'refresh_rate', 20)
-    if config_option_fix(unparsed_config, 'asg', 'debug'):
+    if config_option_check(unparsed_config, 'asg', 'debug'):
         unparsed_config.set('asg', 'debug', False)
     # Consul
-    if config_option_fix(unparsed_config, 'consul', 'use_consul'):
+    if config_option_check(unparsed_config, 'consul', 'use_consul'):
         unparsed_config.set('consul', 'use_consul', False)
-    if config_option_fix(unparsed_config, 'consul', 'file_dir'):
+    if config_option_check(unparsed_config, 'consul', 'file_dir'):
         unparsed_config.set('consul', 'file_dir', '/tmp')
-    if config_option_fix(unparsed_config, 'consul', 'refresh_rate'):
+    if config_option_check(unparsed_config, 'consul', 'refresh_rate'):
         unparsed_config.set('consul', 'refresh_rate', 5)
-    if config_option_fix(unparsed_config, 'consul', 'debug'):
+    if config_option_check(unparsed_config, 'consul', 'debug'):
         unparsed_config.set('consul', 'debug', False)
 
     # Shutdown detection
-    if config_option_fix(unparsed_config, 'shutdown', 'detect_shutdown'):
+    if config_option_check(unparsed_config, 'shutdown', 'detect_shutdown'):
         unparsed_config.set('shutdown', 'use_shutdown', False)
-    if config_option_fix(unparsed_config, 'shutdown', 'shutdown_file'):
+    if config_option_check(unparsed_config, 'shutdown', 'shutdown_file'):
         unparsed_config.set('shutdown', 'shutdown_file', '/tmp/shutdown_detect_upstreamr.json')
-    if config_option_fix(unparsed_config, 'shutdown', 'refresh_rate'):
+    if config_option_check(unparsed_config, 'shutdown', 'refresh_rate'):
         unparsed_config.set('shutdown', 'refresh_rate', 60)
-    if config_option_fix(unparsed_config, 'shutdown', 'debug'):
+    if config_option_check(unparsed_config, 'shutdown', 'debug'):
         unparsed_config.set('shutdown', 'debug', False)
 
     # EM
-    if config_option_fix(unparsed_config, 'em', 'server'):
+    if config_option_check(unparsed_config, 'em', 'server'):
         unparsed_config.set('em', 'server', 'localhost')
-    if config_option_fix(unparsed_config, 'em', 'user'):
+    if config_option_check(unparsed_config, 'em', 'user'):
         unparsed_config.set('em', 'user', None)
-    if config_option_fix(unparsed_config, 'em', 'password'):
+    if config_option_check(unparsed_config, 'em', 'password'):
         unparsed_config.set('em', 'password', None)
-    if config_option_fix(unparsed_config, 'em', 'operation'):
+    if config_option_check(unparsed_config, 'em', 'operation'):
         unparsed_config.set('em', 'operation', 'get_upstreams_config')
-    if config_option_fix(unparsed_config, 'em', 'operation_parameters'):
+    if config_option_check(unparsed_config, 'em', 'operation_parameters'):
         unparsed_config.set('em', 'operation_parameters', {})
 
     # Write finished config
@@ -941,7 +941,7 @@ def main():
     else:
         log.info('No consul runner')
     if CONFIG['shutdown']['detect_shutdown']:
-        log.info('Starting Consul Refresher thread')
+        log.info('Starting Shutdown Detection thread')
         shutdown_runner.daemon = True
         shutdown_runner.start()
         running_processes.append(shutdown_runner)
