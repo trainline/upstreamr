@@ -593,7 +593,7 @@ def shutdown_thread_runner():
             while True:
                 ec2_conn = awsconn(servicename='ec2')
                 filters = {'instance-state-name' : ['shutting-down', 'terminated', 'stopping', 'stopped']}
-                results = ec2_conn.get_all_instance_status(filters=filters)
+                results = ec2_conn.get_all_reservations(filters=filters)
                 instances = [i for r in results for i in r.instances]
                 for i in instances:
                     if i.private_ip_address is not None:
