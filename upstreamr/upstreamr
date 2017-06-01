@@ -584,7 +584,6 @@ def template_thread_runner():
 def shutdown_thread_runner():
     """ Instance Status to filter instances that are shutting-down """
     log = LogWrapper()
-    ip_list = []
     # Enable debug if needed
     if CONFIG['shutdown']['debug']:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -595,6 +594,7 @@ def shutdown_thread_runner():
                 filters = {'instance-state-name' : ['shutting-down', 'terminated', 'stopping', 'stopped']}
                 results = ec2_conn.get_all_reservations(filters=filters)
                 instances = [i for r in results for i in r.instances]
+                ip_list = []
                 for i in instances:
                     if i.private_ip_address is not None:
                         ip_list.append(i.private_ip_address)
